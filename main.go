@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +9,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/gmail/v1"
+	"google.golang.org/api/option"
 
 	"github.com/gin-gonic/gin"
 )
@@ -57,64 +56,65 @@ func main() {
 			c.JSON(http.StatusInternalServerError, err)
 		}
 
-		some, err := client.Exchange(c, "replace with server auth Code") //TODO: Replace with server auth code
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, err)
-		}
-		fmt.Print(some)
-
-		dt, err := json.Marshal(some)
-		print(dt)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, err)
-		}
-
-		c.JSON(http.StatusOK, gin.H{"code": dt})
-		// gmailService, err := gmail.NewService(c, option.WithTokenSource(config.TokenSource(c, &oauth2.Token{AccessToken: data["accessToken"]})))
+		// some, err := client.Exchange(c, "replace with server auth Code") //TODO: Replace with server auth code
 		// if err != nil {
 		// 	c.JSON(http.StatusInternalServerError, err)
-		// 	return
 		// }
+		// fmt.Print(some)
 
-		// messages, err := gmailService.Users.Messages.List("me").Do()
+		// dt, err := json.Marshal(some)
+		// print(dt)
 		// if err != nil {
 		// 	c.JSON(http.StatusInternalServerError, err)
-		// 	return
 		// }
 
-		// var snippets []string
+		// c.JSON(http.StatusOK, gin.H{"code": dt})
+		gmailService, err := gmail.NewService(c, option.WithTokenSource(client.TokenSource(c, &oauth2.Token{AccessToken: data["accessToken"]})))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, err)
+			return
+		}
 
-		// for index, message := range messages.Messages {
-		// 	if index == 5 {
-		// 		break
-		// 	}
-		// 	msg, err := gmailService.Users.Messages.Get("me", message.Id).Do()
-		// 	if err != nil {
-		// 		c.AbortWithError(http.StatusInternalServerError, err)
-		// 		return
-		// 	}
-		// 	snippets = append(snippets, msg.Snippet)
-		// }
+		messages, err := gmailService.Users.Messages.List("me").Do()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, err)
+			return
+		}
 
-		// // Return the list of snippets as a JSON response.
-		// c.JSON(http.StatusOK, gin.H{"snippets": snippets})
+		var snippets []string
+
+		for index, message := range messages.Messages {
+			if index == 2 {
+				break
+			}
+			msg, err := gmailService.Users.Messages.Get("me", message.Id).Do()
+			if err != nil {
+				c.AbortWithError(http.StatusInternalServerError, err)
+				return
+			}
+			snippets = append(snippets, msg.Snippet)
+		}
+
+		// Return the list of snippets as a JSON response.
+		c.JSON(http.StatusOK, gin.H{"snippets": snippets})
 	})
 
-	// router.GET("/login", func(c *gin.Context) {
-	// 	// Get the access token from the request header.
+	router.GET("/login", func(c *gin.Context) {
+		// Get the access token from the request header.
+		token := c.GetHeader("code");
 
-	// 	data := map[string]string{"accessToken": token["accessToken"]}
+		data := map[string]string{"accessToken": token}
 
-	// 	file, err := json.MarshalIndent(data, "", " ")
-	// 	if err != nil {
-	// 		log.Fatal("Unable to store access token", err)
-	// 	}
+		file, err := json.MarshalIndent(data, "", " ")
+		if err != nil {
+			log.Fatal("Unable to store access token", err)
+		}
 
-	// 	os.WriteFile("data.json", file, 0644)
+		os.WriteFile("data.json", file, 0644)
 
-	// 	c.JSON(http.StatusOK, gin.H{"message": "Authentication successfull"})
+		c.JSON(http.StatusOK, gin.H{"message": "Authentication successfull"})
 
-	// })
+	})
 
 	// Start the server.
 	if err := router.Run(":8000"); err != nil {
